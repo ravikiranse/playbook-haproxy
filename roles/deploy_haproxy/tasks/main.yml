@@ -1,0 +1,94 @@
+---
+- name: Purge host enteries
+  lineinfile: 
+    dest: /etc/hosts
+    state: absent
+    regexp: '.*# ansible-managed$'
+  when: hostvars[item].ansible_eth1.ipv4.address is defined
+  with_items: groups['all']
+
+- name: Register host entries
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '.*{{ item }}$' 
+    line: "{{ hostvars[item].ansible_eth1.ipv4.address }} {{  hostvars[item].ansible_hostname }} # ansible-managed"
+    state: present
+  when: hostvars[item].ansible_eth1.ipv4.address is defined
+  with_items: groups['all']
+
+- name: Download and install haproxy, sshpass, pacemaker, vim-haproxy and rsync
+  apt: pkg={{item}} state=installed force=yes update_cache=yes
+  with_items:
+    - haproxy
+    - sshpass 
+    - pacemaker
+    - vim-haproxy
+    - rsync
+
+- name: Generate ssh key for root
+  user: name=root generate_ssh_key=yes ssh_key_comment={{ ansible_ssh_user }}-{{ ansible_hostname}}
+
+- name: Register keys with each system
+  command: sshpass -p {{ ansible_password }} ssh-copy-id -o StrictHostKeyChecking=no {{ ansible_ssh_user }}@{{  hostvars[item].ansible_hostname }}
+  when: hostvars[item].ansible_eth1.ipv4.address is defined
+  with_items: groups['all']
+
+- name: Enable corosync to start at boot
+  command: sed -i s/START=no/START=yes/ /etc/default/corosync
+
+- name: Verify authkey already present
+  stat: path=/etc/corosync/authkey
+  register: authkeyPresent
+  when:  ansible_hostname  == "{{ node1 }}"
+
+- name: Run corosync-keygen command
+  script: corosync-keygen.sh
+  when:  ( ansible_hostname  == "{{ node1 }}" and (authkeyPresent.stat.exists != True) )
+
+- name: Prepare corosync configuration file
+  template: src=corosync.conf.j2 dest=/etc/corosync/corosync.conf owner=root group=root mode=0644
+
+- name: Synchronize the corosync configuration
+  synchronize:
+      src: /etc/corosync
+      dest: /etc/
+      mode: push
+  delegate_to: "{{ node1 }}"
+  when:  ansible_hostname  != "{{ node1 }}"
+
+- name: Start corosync service
+  service: name=corosync state=restarted
+
+- name: Start pacemaker service
+  service: name=pacemaker state=restarted
+  
+- name: Stage haproxy.cfg to the haproxy nodes
+  template: src=haproxy.cfg.j2 dest=/etc/haproxy/haproxy.cfg owner=root group=root mode=0644
+
+- name: Create HAProxy configuration directory
+  file: path=/etc/haproxy/conf.d state=directory owner=root group=root mode=0755 
+
+- name: Stage configuration files for HAProxy
+  template: src={{ item }} dest=/etc/haproxy/conf.d/ owner=root group=root mode=0644
+  with_items:
+    - 040-trove.cfg
+    - 050-mistral.cfg
+    - 060-databasemq.cfg
+
+- name: Create SSL directory in /etc/haproxy/conf.d
+  file: path=/etc/haproxy/conf.d/ssl state=directory owner=root group=root mode=0755
+
+- name: Stage SSL certificates for HAProxy
+  template: src={{ item }} dest=/etc/haproxy/conf.d/ssl/ owner=root group=root mode=0644
+  with_items:
+    - "{{ trove_cert_name }}"
+    - "{{ mistral_cert_name }}"
+    - "{{ rabbitmq_cert_name }}"
+    - "{{ ca_cert__name }}"
+
+- name: Execute crm commands
+  script: crm-setup.sh {{ xaas_vip }}
+  when: ansible_hostname == "{{ node1 }}"
+
+- name: Start the haproxy service
+  service: name=haproxy state=started enabled=yes

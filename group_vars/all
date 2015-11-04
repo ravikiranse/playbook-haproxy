@@ -1,0 +1,18 @@
+---
+
+proxy_env: []
+#  http_proxy: http://one.proxy.att.com:8888
+#  https_proxy: https://one.proxy.att.com:8888
+#  no_proxy: 127.0.0.1,localhost
+
+
+node1: mistral-1
+node2: mistral-2
+bindnetaddr: 10.0.0.0
+count: 0
+
+trove_cert_name: database-aic.mtn3.cci.att.com.pem
+mistral_cert_name: workflow-aic.mtn3.cci.att.com.pem
+rabbitmq_cert_name: databasemq-aic.mtn3.cci.att.com.pem
+ca_cert__name: ca.pem
+xaas_vip: 10.0.0.11

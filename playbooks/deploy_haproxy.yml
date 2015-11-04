@@ -1,0 +1,6 @@
+---
+
+- name: Deploy haproxy
+  hosts: haproxy_nodes
+  roles:
+    - { role: ../roles/deploy_haproxy }

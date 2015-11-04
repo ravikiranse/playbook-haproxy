@@ -1,0 +1,1 @@
+- include: playbooks/deploy_haproxy.yml
