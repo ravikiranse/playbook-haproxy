@@ -57,10 +57,12 @@
   when:  ansible_hostname  != "{{ node1 }}"
 
 - name: Start corosync service
-  service: name=corosync state=restarted
+  service: name=corosync state=started enabled=yes
 
 - name: Start pacemaker service
-  service: name=pacemaker state=restarted
+  service: name=pacemaker state=started enabled=yes
+  async: 60
+  poll:  5
   
 - name: Stage haproxy.cfg to the haproxy nodes
   template: src=haproxy.cfg.j2 dest=/etc/haproxy/haproxy.cfg owner=root group=root mode=0644
