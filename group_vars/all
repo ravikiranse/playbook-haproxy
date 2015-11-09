@@ -16,3 +16,4 @@ mistral_cert_name: workflow-aic.mtn3.cci.att.com.pem
 rabbitmq_cert_name: databasemq-aic.mtn3.cci.att.com.pem
 ca_cert__name: ca.pem
 xaas_vip: 10.0.0.11
+xaas_vip_nic: eth1

@@ -16,11 +16,15 @@
   when: hostvars[item].ansible_eth1.ipv4.address is defined
   with_items: groups['all']
 
-- name: Download and install haproxy, sshpass, pacemaker, vim-haproxy and rsync
-  apt: pkg={{item}} state=installed force=yes update_cache=yes
+- name: Performs an apt-get dist-upgrade 
+  apt: upgrade=dist update_cache=yes dpkg_options='force-confold,force-confdef' force=yes
+
+- name: Download and install haproxy, sshpass,corosync, pacemaker, vim-haproxy and rsync
+  apt: pkg={{item}} state=latest force=yes update_cache=yes 
   with_items:
     - haproxy
     - sshpass 
+    - corosync
     - pacemaker
     - vim-haproxy
     - rsync
@@ -88,8 +92,12 @@
     - "{{ rabbitmq_cert_name }}"
     - "{{ ca_cert__name }}"
 
-- name: Execute crm commands
-  script: crm-setup.sh {{ xaas_vip }}
+- name: Setup Virtual IP failover configuration.
+  script: virtual-ip-failover-configuration.sh {{ xaas_vip }} {{ xaas_vip_nic }}
+  when: ansible_hostname == "{{ node1 }}"
+
+- name: HAProxy failover configuration.
+  script: haproxy-failover-configuration.sh 
   when: ansible_hostname == "{{ node1 }}"
 
 - name: Start the haproxy service
